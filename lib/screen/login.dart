@@ -207,7 +207,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _handleNewGame() {
-    Navigator.pushNamed(context, '/new-game');
+    Navigator.pushNamed(context, '/waiting-room');
   }
 
   void _handleJoinGame() {

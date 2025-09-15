@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'screen/login.dart';
 import 'screen/joinGame.dart';
 import 'screen/createGame.dart';
+import 'screen/waiting-room.screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -164,6 +165,7 @@ class MyApp extends StatelessWidget {
         '/': (context) => const LoginScreen(),
         '/join-game': (context) => const JoinGameScreen(),
         '/new-game': (context) => const CreateGameScreen(),
+        '/waiting-room': (context) => const WaitingRoomScreen(),
       },
     );
   }
