@@ -26,6 +26,9 @@ class _LoginScreenState extends State<LoginScreen> {
         _isLoading = true;
       });
 
+      // S'assurer que le username est bien sauvegardé
+      global.username = _usernameController.text.trim();
+
       // Simulation d'une connexion
       await Future.delayed(const Duration(seconds: 2));
 
@@ -187,9 +190,9 @@ class _LoginScreenState extends State<LoginScreen> {
       children: [
         const SizedBox(height: 16),
 
-        // Message de bienvenue
+        // Message de bienvenue - Utilisation du controller comme fallback
         Text(
-          'Bienvenue ${global.username} !',
+          'Bienvenue ${global.username.isNotEmpty ? global.username : _usernameController.text.trim()} !',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
             fontSize: 24,
             fontWeight: FontWeight.bold,

@@ -162,8 +162,8 @@ class MyApp extends StatelessWidget {
       initialRoute: '/',
       routes: {
         '/': (context) => const LoginScreen(),
-        '/joinGame': (context) => const JoinGameScreen(),
-        '/createGame': (context) => const CreateGameScreen(),
+        '/new-game': (context) => const JoinGameScreen(),
+        '/join-game': (context) => const CreateGameScreen(),
       },
     );
   }
