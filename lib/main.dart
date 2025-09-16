@@ -3,6 +3,7 @@ import 'screen/login.dart';
 import 'screen/joinGame.dart';
 import 'screen/createGame.dart';
 import 'screen/waiting-room.screen.dart';
+import 'screen/joinWaitingRoom.screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -166,6 +167,7 @@ class MyApp extends StatelessWidget {
         '/join-game': (context) => const JoinGameScreen(),
         '/new-game': (context) => const CreateGameScreen(),
         '/waiting-room': (context) => const WaitingRoomScreen(),
+        '/join-waiting-room': (context) => const JoinWaitingRoomScreen(),
       },
     );
   }
