@@ -23,6 +23,7 @@ class _CreateChallengeScreenState extends State<CreateChallengeScreen> {
           ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
       if (args != null) {
         _gameSessionId = args['gameSessionId'];
+        print('Game Session ID reçu: $_gameSessionId');
       }
     });
   }
@@ -49,6 +50,65 @@ class _CreateChallengeScreenState extends State<CreateChallengeScreen> {
     });
   }
 
+  Future<void> _testSingleChallenge() async {
+    if (_gameSessionId == null) return;
+
+    print('=== TEST D\'UN SEUL CHALLENGE ===');
+
+    final testPayload = {
+      'first_word': 'une',
+      'second_word': 'poule',
+      'third_word': 'sur',
+      'fourth_word': 'un',
+      'fifth_word': 'mur',
+      'forbidden_words': ['volaille', 'brique', 'poulet'],
+    };
+
+    print('Test payload: ${jsonEncode(testPayload)}');
+    print(
+      'URL: https://pictioniary.wevox.cloud/api/game_sessions/$_gameSessionId/challenges',
+    );
+    print('Token: ${global.token}');
+
+    try {
+      final response = await http.post(
+        Uri.parse(
+          'https://pictioniary.wevox.cloud/api/game_sessions/$_gameSessionId/challenges',
+        ),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${global.token}',
+        },
+        body: jsonEncode(testPayload),
+      );
+
+      print('Test Status: ${response.statusCode}');
+      print('Test Headers: ${response.headers}');
+      print('Test Response: ${response.body}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Test réussi !'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Test échoué: ${response.statusCode}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Erreur test: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur test: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   Future<void> _sendChallenges() async {
     if (_challenges.length != 3 || _gameSessionId == null || _isSending) return;
 
@@ -57,7 +117,32 @@ class _CreateChallengeScreenState extends State<CreateChallengeScreen> {
     });
 
     try {
-      for (var challenge in _challenges) {
+      print('=== ENVOI DES 3 CHALLENGES ===');
+      print('Game Session ID: $_gameSessionId');
+      print('Nombre de challenges: ${_challenges.length}');
+      print('Token: ${global.token}');
+
+      for (int i = 0; i < _challenges.length; i++) {
+        final challenge = _challenges[i];
+
+        print('\n--- Challenge ${i + 1}/3 ---');
+        print('Challenge data: $challenge');
+
+        // Préparation du payload
+        final payload = {
+          'first_word': challenge['first_word'],
+          'second_word': challenge['second_word'],
+          'third_word': challenge['third_word'],
+          'fourth_word': challenge['fourth_word'],
+          'fifth_word': challenge['fifth_word'],
+          'forbidden_words': challenge['forbidden_words'],
+        };
+
+        print('Payload à envoyer: ${jsonEncode(payload)}');
+        print(
+          'URL complète: https://pictioniary.wevox.cloud/api/game_sessions/$_gameSessionId/challenges',
+        );
+
         final response = await http.post(
           Uri.parse(
             'https://pictioniary.wevox.cloud/api/game_sessions/$_gameSessionId/challenges',
@@ -66,40 +151,70 @@ class _CreateChallengeScreenState extends State<CreateChallengeScreen> {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer ${global.token}',
           },
-          body: jsonEncode({
-            'first_word': challenge['first_word'],
-            'second_word': challenge['second_word'],
-            'third_word': challenge['third_word'],
-            'fourth_word': challenge['fourth_word'],
-            'fifth_word': challenge['fifth_word'],
-            'forbidden_words': challenge['forbidden_words'],
-          }),
+          body: jsonEncode(payload),
         );
 
-        print('Envoi challenge: ${response.statusCode}');
-        print('Réponse: ${response.body}');
+        print('Challenge ${i + 1} - Status: ${response.statusCode}');
+        print('Challenge ${i + 1} - Headers: ${response.headers}');
+        print('Challenge ${i + 1} - Réponse complète: ${response.body}');
 
         if (response.statusCode != 200 && response.statusCode != 201) {
-          throw Exception('Erreur lors de l\'envoi du challenge');
+          // Plus de détails sur l'erreur
+          print('ERREUR DÉTAILLÉE:');
+          print(
+            'URL: https://pictioniary.wevox.cloud/api/game_sessions/$_gameSessionId/challenges',
+          );
+          print(
+            'Headers envoyés: Content-Type: application/json, Authorization: Bearer ${global.token}',
+          );
+          print('Body envoyé: ${jsonEncode(payload)}');
+
+          String errorMessage = 'Erreur ${response.statusCode}';
+
+          // Essayer de parser la réponse d'erreur
+          try {
+            final errorData = jsonDecode(response.body);
+            if (errorData is Map && errorData.containsKey('message')) {
+              errorMessage = errorData['message'];
+            } else if (errorData is Map && errorData.containsKey('error')) {
+              errorMessage = errorData['error'];
+            }
+          } catch (e) {
+            print('Impossible de parser l\'erreur JSON: $e');
+          }
+
+          throw Exception(
+            'Challenge ${i + 1}: $errorMessage (${response.statusCode})',
+          );
         }
+
+        print('✅ Challenge ${i + 1} envoyé avec succès');
       }
+
+      print('\n🎉 Tous les challenges envoyés avec succès !');
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Challenges envoyés avec succès !'),
+          content: Text('Vos défis ont été envoyés !'),
           backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
         ),
       );
 
-      // Navigation vers l'écran de jeu
+      // Navigation vers l'écran d'attente des challenges
       Navigator.pushReplacementNamed(
         context,
-        '/game',
+        '/waiting-challenges',
         arguments: {'gameSessionId': _gameSessionId},
       );
     } catch (e) {
+      print('❌ ERREUR GLOBALE: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text('Erreur: $e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
+        ),
       );
     } finally {
       setState(() {
@@ -133,7 +248,34 @@ class _CreateChallengeScreenState extends State<CreateChallengeScreen> {
                 context,
               ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
             ),
-            const SizedBox(height: 24),
+
+            // Debug info
+            if (_gameSessionId != null)
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 16),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Debug Info:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                    Text('Session ID: $_gameSessionId'),
+                    Text('Token: ${global.token?.substring(0, 20)}...'),
+                  ],
+                ),
+              ),
+
+            const SizedBox(height: 8),
 
             // Compteur de défis
             Container(
@@ -193,40 +335,70 @@ class _CreateChallengeScreenState extends State<CreateChallengeScreen> {
             const SizedBox(height: 16),
 
             // Boutons d'action
-            Row(
+            Column(
               children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed:
-                        _challenges.length < 3
-                            ? _showCreateChallengeModal
-                            : null,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Ajouter un défi'),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed:
+                            _challenges.length < 3 && !_isSending
+                                ? _showCreateChallengeModal
+                                : null,
+                        icon: const Icon(Icons.add),
+                        label: const Text('Ajouter un défi'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed:
+                            _challenges.length == 3 && !_isSending
+                                ? _sendChallenges
+                                : null,
+                        icon:
+                            _isSending
+                                ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
+                                  ),
+                                )
+                                : const Icon(Icons.send),
+                        label: Text(
+                          _isSending ? 'Envoi...' : 'Envoyer les défis',
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor:
+                              _challenges.length == 3 ? Colors.green : null,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 16),
-                Expanded(
+
+                const SizedBox(height: 12),
+
+                // Bouton de test
+                SizedBox(
+                  width: double.infinity,
                   child: ElevatedButton.icon(
                     onPressed:
-                        _challenges.length == 3 && !_isSending
-                            ? _sendChallenges
+                        _gameSessionId != null && !_isSending
+                            ? _testSingleChallenge
                             : null,
-                    icon:
-                        _isSending
-                            ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                            : const Icon(Icons.send),
-                    label: Text(_isSending ? 'Envoi...' : 'Envoyer'),
+                    icon: const Icon(Icons.bug_report),
+                    label: const Text('Test 1 défi (Debug)'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor:
-                          _challenges.length == 3 ? Colors.green : null,
+                      backgroundColor: Colors.orange,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
                   ),
@@ -304,12 +476,13 @@ class _CreateChallengeScreenState extends State<CreateChallengeScreen> {
                     ),
                   ),
                 ),
-                IconButton(
-                  onPressed: () => _removeChallenge(index),
-                  icon: const Icon(Icons.delete, color: Colors.red),
-                  constraints: const BoxConstraints(),
-                  padding: EdgeInsets.zero,
-                ),
+                if (!_isSending)
+                  IconButton(
+                    onPressed: () => _removeChallenge(index),
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    constraints: const BoxConstraints(),
+                    padding: EdgeInsets.zero,
+                  ),
               ],
             ),
             const SizedBox(height: 12),
@@ -452,6 +625,30 @@ class _CreateChallengeModalState extends State<CreateChallengeModal> {
         ],
       };
 
+      // Debug du challenge créé
+      print('=== CHALLENGE CRÉÉ ===');
+      print('Challenge data: $challenge');
+      print('Types: ');
+      print(
+        '  first_word: ${challenge['first_word'].runtimeType} = "${challenge['first_word']}"',
+      );
+      print(
+        '  second_word: ${challenge['second_word'].runtimeType} = "${challenge['second_word']}"',
+      );
+      print(
+        '  third_word: ${challenge['third_word'].runtimeType} = "${challenge['third_word']}"',
+      );
+      print(
+        '  fourth_word: ${challenge['fourth_word'].runtimeType} = "${challenge['fourth_word']}"',
+      );
+      print(
+        '  fifth_word: ${challenge['fifth_word'].runtimeType} = "${challenge['fifth_word']}"',
+      );
+      print(
+        '  forbidden_words: ${challenge['forbidden_words'].runtimeType} = ${challenge['forbidden_words']}',
+      );
+      print('JSON: ${jsonEncode(challenge)}');
+
       widget.onChallengeCreated(challenge);
       Navigator.pop(context);
     }
@@ -561,6 +758,9 @@ class _CreateChallengeModalState extends State<CreateChallengeModal> {
                                 }
                                 return null;
                               },
+                              onChanged: (value) {
+                                setState(() {}); // Pour mettre à jour l'aperçu
+                              },
                             ),
                           ),
                         ],
@@ -646,6 +846,9 @@ class _CreateChallengeModalState extends State<CreateChallengeModal> {
                                   return 'Requis';
                                 }
                                 return null;
+                              },
+                              onChanged: (value) {
+                                setState(() {}); // Pour mettre à jour l'aperçu
                               },
                             ),
                           ),

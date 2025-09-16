@@ -6,6 +6,8 @@ import 'screen/create-game.dart';
 import 'screen/owner-Waiting-room.screen.dart';
 import 'screen/join-waiting-room.screen.dart';
 import 'screen/create-challenge.screen.dart';
+import 'screen/waiting-challenge.screen.dart';
+import 'screen/game.screen.dart';
 
 void main() {
   runApp(ProviderScope(child: const MyApp()));
@@ -171,6 +173,8 @@ class MyApp extends StatelessWidget {
         '/waiting-room': (context) => const WaitingRoomScreen(),
         '/join-waiting-room': (context) => const JoinWaitingRoomScreen(),
         '/create-challenge': (context) => const CreateChallengeScreen(),
+        '/waiting-challenges': (context) => const WaitingChallengesScreen(),
+        '/game': (context) => const GameScreen(),
       },
     );
   }
