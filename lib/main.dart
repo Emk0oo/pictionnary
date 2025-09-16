@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'screen/login.dart';
-import 'screen/joinGame.dart';
-import 'screen/createGame.dart';
-import 'screen/waiting-room.screen.dart';
-import 'screen/joinWaitingRoom.screen.dart';
+import 'screen/join-game.dart';
+import 'screen/create-game.dart';
+import 'screen/owner-Waiting-room.screen.dart';
+import 'screen/join-waiting-room.screen.dart';
 
 void main() {
   runApp(const MyApp());
