@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'screen/login.dart';
 import 'screen/join-game.dart';
 import 'screen/create-game.dart';
 import 'screen/owner-Waiting-room.screen.dart';
 import 'screen/join-waiting-room.screen.dart';
+import 'screen/create-challenge.screen.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(ProviderScope(child: const MyApp()));
 }
 
 class MyApp extends StatelessWidget {
@@ -168,6 +170,7 @@ class MyApp extends StatelessWidget {
         '/new-game': (context) => const CreateGameScreen(),
         '/waiting-room': (context) => const WaitingRoomScreen(),
         '/join-waiting-room': (context) => const JoinWaitingRoomScreen(),
+        '/create-challenge': (context) => const CreateChallengeScreen(),
       },
     );
   }

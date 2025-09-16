@@ -38,6 +38,7 @@ dependencies:
   mobile_scanner: ^5.2.3
   http: ^1.1.0  # Ajoute cette ligne
   qr_flutter: ^4.1.0  # Ajoute cette ligne
+  flutter_riverpod: ^2.6.1
 
 
 dev_dependencies:

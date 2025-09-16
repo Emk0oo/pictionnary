@@ -13,11 +13,15 @@ class JoinWaitingRoomScreen extends StatefulWidget {
 
 class _JoinWaitingRoomScreenState extends State<JoinWaitingRoomScreen> {
   Timer? _refreshTimer;
+  Timer? _statusTimer;
+  Timer? _autoStartTimer;
   bool _isLoading = true;
+  int _autoStartCountdown = 0;
   String? _gameSessionId;
   String? _playerTeam;
   Map<String, dynamic>? _gameSession;
   Map<int, String> _playerNames = {};
+  String _gameStatus = 'lobby';
 
   @override
   void initState() {
@@ -29,6 +33,7 @@ class _JoinWaitingRoomScreenState extends State<JoinWaitingRoomScreen> {
         _gameSessionId = args['gameSessionId'];
         _playerTeam = args['team'];
         _loadGameSession();
+        _startStatusChecking();
       }
     });
   }
@@ -36,10 +41,59 @@ class _JoinWaitingRoomScreenState extends State<JoinWaitingRoomScreen> {
   @override
   void dispose() {
     _refreshTimer?.cancel();
+    _statusTimer?.cancel();
+    _autoStartTimer?.cancel();
     super.dispose();
   }
 
-  // Charger les informations de la session
+  void _startStatusChecking() {
+    _statusTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
+      _checkGameStatus();
+    });
+  }
+
+  Future<void> _checkGameStatus() async {
+    if (_gameSessionId == null) return;
+
+    try {
+      print('=== VÉRIFICATION STATUS PARTIE ===');
+
+      final response = await http.get(
+        Uri.parse(
+          'https://pictioniary.wevox.cloud/api/game_sessions/$_gameSessionId/status',
+        ),
+        headers: {'Authorization': 'Bearer ${global.token}'},
+      );
+
+      print('Status response: ${response.statusCode}');
+      print('Status body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final statusData = jsonDecode(response.body);
+        final newStatus = statusData['status'];
+
+        setState(() {
+          _gameStatus = newStatus;
+        });
+
+        print('Status de la partie: $newStatus');
+
+        // Si la partie a commencé, naviguer vers create-challenge
+        if (newStatus == 'in_progress' || newStatus == 'started') {
+          print('La partie a commencé ! Navigation vers create-challenge');
+
+          Navigator.pushReplacementNamed(
+            context,
+            '/create-challenge',
+            arguments: {'gameSessionId': _gameSessionId},
+          );
+        }
+      }
+    } catch (e) {
+      print('Erreur vérification status: $e');
+    }
+  }
+
   Future<void> _loadGameSession() async {
     if (_gameSessionId == null) return;
 
@@ -58,8 +112,6 @@ class _JoinWaitingRoomScreenState extends State<JoinWaitingRoomScreen> {
           _isLoading = false;
         });
         await _loadPlayerNames();
-
-        // Démarrer le rafraîchissement automatique
         _startRefreshing();
       } else {
         throw Exception('Session introuvable');
@@ -72,14 +124,12 @@ class _JoinWaitingRoomScreenState extends State<JoinWaitingRoomScreen> {
     }
   }
 
-  // Démarrer le rafraîchissement automatique
   void _startRefreshing() {
     _refreshTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
       _refreshGameSession();
     });
   }
 
-  // Rafraîchir la session
   Future<void> _refreshGameSession() async {
     if (_gameSessionId == null) return;
 
@@ -98,14 +148,13 @@ class _JoinWaitingRoomScreenState extends State<JoinWaitingRoomScreen> {
         });
         await _loadPlayerNames();
 
-        // Vérifier si la partie a commencé
-        if (_gameSession!['status'] == 'in_progress' ||
-            _gameSession!['status'] == 'started') {
-          Navigator.pushReplacementNamed(
-            context,
-            '/game',
-            arguments: {'gameSessionId': _gameSessionId},
-          );
+        // Vérifier si on a 4 joueurs pour auto-start
+        final allPlayers = _getAllPlayers();
+        if (allPlayers.length == 4 &&
+            _autoStartTimer == null &&
+            _autoStartCountdown == 0 &&
+            _gameStatus == 'lobby') {
+          _startAutoStartCountdown();
         }
       }
     } catch (e) {
@@ -113,7 +162,24 @@ class _JoinWaitingRoomScreenState extends State<JoinWaitingRoomScreen> {
     }
   }
 
-  // Quitter la session
+  void _startAutoStartCountdown() {
+    setState(() {
+      _autoStartCountdown = 5;
+    });
+
+    _autoStartTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() {
+        _autoStartCountdown--;
+      });
+
+      if (_autoStartCountdown <= 0) {
+        timer.cancel();
+        _autoStartTimer = null;
+        // Le créateur lancera automatiquement la partie
+      }
+    });
+  }
+
   Future<void> _leaveSession() async {
     if (_gameSessionId == null) return;
 
@@ -130,7 +196,6 @@ class _JoinWaitingRoomScreenState extends State<JoinWaitingRoomScreen> {
     Navigator.pop(context);
   }
 
-  // Charger les noms des joueurs
   Future<void> _loadPlayerNames() async {
     final allPlayerIds = _getAllPlayers();
 
@@ -155,7 +220,6 @@ class _JoinWaitingRoomScreenState extends State<JoinWaitingRoomScreen> {
     }
   }
 
-  // Récupérer tous les joueurs
   List<int> _getAllPlayers() {
     if (_gameSession == null) return [];
 
@@ -230,7 +294,16 @@ class _JoinWaitingRoomScreenState extends State<JoinWaitingRoomScreen> {
           _buildPlayerInfo(),
           const SizedBox(height: 16),
           _buildGameInfo(),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
+
+          // Affichage du status de la partie
+          _buildGameStatusInfo(),
+          const SizedBox(height: 16),
+
+          // Affichage du countdown si auto-start
+          if (_autoStartCountdown > 0) _buildAutoStartCountdown(),
+          if (_autoStartCountdown > 0) const SizedBox(height: 16),
+
           Expanded(
             child: Row(
               children: [
@@ -246,6 +319,76 @@ class _JoinWaitingRoomScreenState extends State<JoinWaitingRoomScreen> {
           ),
           const SizedBox(height: 16),
           _buildWaitingMessage(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGameStatusInfo() {
+    Color statusColor;
+    IconData statusIcon;
+    String statusText;
+
+    switch (_gameStatus) {
+      case 'lobby':
+        statusColor = Colors.orange;
+        statusIcon = Icons.people;
+        statusText = 'En attente dans le salon';
+        break;
+      case 'in_progress':
+      case 'started':
+        statusColor = Colors.green;
+        statusIcon = Icons.play_arrow;
+        statusText = 'Partie en cours de démarrage...';
+        break;
+      default:
+        statusColor = Colors.grey;
+        statusIcon = Icons.info;
+        statusText = 'Status: $_gameStatus';
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: statusColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: statusColor.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(statusIcon, color: statusColor, size: 20),
+          const SizedBox(width: 8),
+          Text(
+            statusText,
+            style: TextStyle(color: statusColor, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAutoStartCountdown() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.green[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.green[200]!),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.timer, color: Colors.green[600]),
+          const SizedBox(width: 12),
+          Text(
+            'Démarrage automatique dans $_autoStartCountdown secondes...',
+            style: TextStyle(
+              color: Colors.green[700],
+              fontWeight: FontWeight.w600,
+              fontSize: 16,
+            ),
+          ),
         ],
       ),
     );
@@ -439,10 +582,12 @@ class _JoinWaitingRoomScreenState extends State<JoinWaitingRoomScreen> {
         children: [
           Icon(Icons.hourglass_empty, color: Colors.orange[600]),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Text(
-              'En attente que le créateur de la partie lance le jeu...',
-              style: TextStyle(fontSize: 14),
+              _gameStatus == 'lobby'
+                  ? 'En attente que le créateur de la partie lance le jeu...'
+                  : 'La partie va bientôt commencer !',
+              style: const TextStyle(fontSize: 14),
             ),
           ),
         ],

@@ -14,11 +14,14 @@ class WaitingRoomScreen extends StatefulWidget {
 
 class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
   Timer? _refreshTimer;
+  Timer? _autoStartTimer;
   bool _isLoading = true;
   bool _isCreatingSession = false;
+  bool _isStarting = false;
+  int _autoStartCountdown = 0;
   String? _gameSessionId;
   Map<String, dynamic>? _gameSession;
-  Map<int, String> _playerNames = {}; // Cache des noms de joueurs
+  Map<int, String> _playerNames = {};
   bool _canStartGame = false;
   String? _errorMessage;
 
@@ -31,10 +34,10 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
   @override
   void dispose() {
     _refreshTimer?.cancel();
+    _autoStartTimer?.cancel();
     super.dispose();
   }
 
-  // Créer une nouvelle session de jeu puis la rejoindre
   Future<void> _createAndJoinGameSession() async {
     setState(() {
       _isCreatingSession = true;
@@ -43,9 +46,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
 
     try {
       print('=== DÉBUT CRÉATION SESSION ===');
-      print('Token: ${global.token}');
 
-      // 1. Créer la session
       final createResponse = await http.post(
         Uri.parse('https://pictioniary.wevox.cloud/api/game_sessions'),
         headers: {
@@ -64,8 +65,6 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
 
         print('Session créée avec ID: $sessionId');
 
-        // 2. Rejoindre la session qu'on vient de créer avec la couleur rouge (créateur = rouge)
-        print('=== DÉBUT JOIN SESSION ===');
         final joinResponse = await http.post(
           Uri.parse(
             'https://pictioniary.wevox.cloud/api/game_sessions/$sessionId/join',
@@ -87,12 +86,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
             _isLoading = false;
           });
 
-          print('Session rejointe avec succès');
-
-          // 3. Rafraîchir immédiatement pour récupérer l'état
           await _refreshGameSession();
-
-          // 4. Démarrer le rafraîchissement automatique
           _startRefreshing();
         } else {
           throw Exception(
@@ -114,28 +108,22 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
     }
   }
 
-  // Démarrer le rafraîchissement automatique
   void _startRefreshing() {
-    _refreshTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+    _refreshTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
       _refreshGameSession();
     });
   }
 
-  // Récupérer les informations de la session
   Future<void> _refreshGameSession() async {
     if (_gameSessionId == null) return;
 
     try {
-      print('=== REFRESH SESSION $_gameSessionId ===');
       final response = await http.get(
         Uri.parse(
           'https://pictioniary.wevox.cloud/api/game_sessions/$_gameSessionId',
         ),
         headers: {'Authorization': 'Bearer ${global.token}'},
       );
-
-      print('Status refresh: ${response.statusCode}');
-      print('Réponse refresh: ${response.body}');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
@@ -144,29 +132,52 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
           _checkCanStartGame();
         });
         await _loadPlayerNames();
-      } else {
-        print('Erreur refresh: ${response.statusCode} - ${response.body}');
+
+        // Vérifier si on a 4 joueurs pour auto-start
+        final allPlayers = _getAllPlayers();
+        if (allPlayers.length == 4 && _autoStartTimer == null && !_isStarting) {
+          _startAutoStartCountdown();
+        }
       }
     } catch (e) {
       print('Erreur lors du rafraîchissement: $e');
     }
   }
 
-  // Récupérer tous les joueurs des deux équipes
+  void _startAutoStartCountdown() {
+    setState(() {
+      _autoStartCountdown = 5;
+    });
+
+    _autoStartTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() {
+        _autoStartCountdown--;
+      });
+
+      if (_autoStartCountdown <= 0) {
+        timer.cancel();
+        _autoStartTimer = null;
+        _startGame();
+      }
+    });
+  }
+
+  void _checkCanStartGame() {
+    final allPlayers = _getAllPlayers();
+    _canStartGame = allPlayers.length >= 2;
+  }
+
   List<int> _getAllPlayers() {
     if (_gameSession == null) return [];
 
     List<int> allPlayers = [];
 
-    // Ajouter les joueurs individuels de l'équipe rouge
     if (_gameSession!['red_player_1'] != null) {
       allPlayers.add(_gameSession!['red_player_1']);
     }
     if (_gameSession!['red_player_2'] != null) {
       allPlayers.add(_gameSession!['red_player_2']);
     }
-
-    // Ajouter les joueurs individuels de l'équipe bleue
     if (_gameSession!['blue_player_1'] != null) {
       allPlayers.add(_gameSession!['blue_player_1']);
     }
@@ -177,7 +188,6 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
     return allPlayers;
   }
 
-  // Récupérer les joueurs de l'équipe rouge
   List<int> _getRedTeamPlayers() {
     if (_gameSession == null) return [];
 
@@ -193,7 +203,6 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
     return redPlayers;
   }
 
-  // Récupérer les joueurs de l'équipe bleue
   List<int> _getBlueTeamPlayers() {
     if (_gameSession == null) return [];
 
@@ -209,17 +218,8 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
     return bluePlayers;
   }
 
-  // Vérifier si on peut démarrer le jeu (au moins 2 joueurs)
-  void _checkCanStartGame() {
-    final allPlayers = _getAllPlayers();
-    _canStartGame = allPlayers.length >= 2;
-    print('Joueurs total: ${allPlayers.length}, Peut démarrer: $_canStartGame');
-  }
-
-  // Charger les noms des joueurs
   Future<void> _loadPlayerNames() async {
     final allPlayerIds = _getAllPlayers();
-    print('IDs joueurs à charger: $allPlayerIds');
 
     for (int playerId in allPlayerIds) {
       if (!_playerNames.containsKey(playerId)) {
@@ -234,7 +234,6 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
             setState(() {
               _playerNames[playerId] = playerData['name'];
             });
-            print('Nom joueur chargé: ${playerId} -> ${playerData['name']}');
           }
         } catch (e) {
           print('Erreur lors du chargement du joueur $playerId: $e');
@@ -243,30 +242,28 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
     }
   }
 
-  // Quitter la session
   Future<void> _leaveSession() async {
     if (_gameSessionId == null) return;
 
     try {
-      final response = await http.get(
+      await http.get(
         Uri.parse(
           'https://pictioniary.wevox.cloud/api/game_sessions/$_gameSessionId/leave',
         ),
         headers: {'Authorization': 'Bearer ${global.token}'},
       );
-
-      if (response.statusCode == 200) {
-        Navigator.pop(context);
-      }
     } catch (e) {
       print('Erreur lors de la sortie de session: $e');
-      Navigator.pop(context);
     }
+    Navigator.pop(context);
   }
 
-  // Démarrer la partie
   Future<void> _startGame() async {
-    if (_gameSessionId == null || !_canStartGame) return;
+    if (_gameSessionId == null || _isStarting) return;
+
+    setState(() {
+      _isStarting = true;
+    });
 
     try {
       final response = await http.post(
@@ -279,10 +276,13 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
       if (response.statusCode == 200) {
         Navigator.pushReplacementNamed(
           context,
-          '/game',
+          '/create-challenge',
           arguments: {'gameSessionId': _gameSessionId},
         );
       } else {
+        setState(() {
+          _isStarting = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Erreur lors du démarrage de la partie'),
@@ -291,6 +291,9 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
         );
       }
     } catch (e) {
+      setState(() {
+        _isStarting = false;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
       );
@@ -362,11 +365,6 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
               },
               child: const Text('Réessayer'),
             ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Retour'),
-            ),
           ],
         ),
       ),
@@ -382,6 +380,11 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
           const SizedBox(height: 24),
           _buildGameInfo(),
           const SizedBox(height: 16),
+
+          // Affichage du countdown si auto-start
+          if (_autoStartCountdown > 0) _buildAutoStartCountdown(),
+          if (_autoStartCountdown > 0) const SizedBox(height: 16),
+
           Expanded(
             child: Row(
               children: [
@@ -397,6 +400,32 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
           ),
           const SizedBox(height: 24),
           _buildStartButton(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAutoStartCountdown() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.green[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.green[200]!),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.timer, color: Colors.green[600]),
+          const SizedBox(width: 12),
+          Text(
+            'Démarrage automatique dans $_autoStartCountdown secondes...',
+            style: TextStyle(
+              color: Colors.green[700],
+              fontWeight: FontWeight.w600,
+              fontSize: 16,
+            ),
+          ),
         ],
       ),
     );
@@ -574,10 +603,32 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
   }
 
   Widget _buildStartButton() {
+    if (_isStarting) {
+      return const SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: null,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              SizedBox(width: 12),
+              Text('Démarrage en cours...'),
+            ],
+          ),
+        ),
+      );
+    }
+
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
-        onPressed: _canStartGame ? _startGame : null,
+        onPressed:
+            _canStartGame && _autoStartCountdown == 0 ? _startGame : null,
         icon: const Icon(Icons.play_arrow),
         label: Text(
           _canStartGame
