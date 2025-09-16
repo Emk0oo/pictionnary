@@ -64,7 +64,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
 
         print('Session créée avec ID: $sessionId');
 
-        // 2. Rejoindre la session qu'on vient de créer
+        // 2. Rejoindre la session qu'on vient de créer avec la couleur rouge (créateur = rouge)
         print('=== DÉBUT JOIN SESSION ===');
         final joinResponse = await http.post(
           Uri.parse(
@@ -74,6 +74,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer ${global.token}',
           },
+          body: jsonEncode({'color': 'red'}),
         );
 
         print('Status join: ${joinResponse.statusCode}');
