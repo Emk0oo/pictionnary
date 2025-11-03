@@ -108,7 +108,10 @@ class _WaitingChallengesScreenState extends State<WaitingChallengesScreen>
           Navigator.pushReplacementNamed(
             context,
             '/game',
-            arguments: {'gameSessionId': _gameSessionId},
+            arguments: {
+              'gameSessionId': _gameSessionId,
+              'mode': 'drawing',
+            },
           );
         }
       }

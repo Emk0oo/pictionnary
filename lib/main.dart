@@ -8,6 +8,8 @@ import 'screen/join-waiting-room.screen.dart';
 import 'screen/create-challenge.screen.dart';
 import 'screen/waiting-challenge.screen.dart';
 import 'screen/game.screen.dart';
+import 'screen/waiting_results.screen.dart';
+import 'screen/results.screen.dart';
 
 void main() {
   runApp(ProviderScope(child: const MyApp()));
@@ -29,7 +31,6 @@ class MyApp extends StatelessWidget {
           secondary: const Color(0xFFFF6B6B), // Rouge corail
           tertiary: const Color(0xFF4ECDC4), // Turquoise
           surface: const Color(0xFFF8F9FA),
-          background: const Color(0xFFF8F9FA),
           error: const Color(0xFFE74C3C),
         ),
 
@@ -87,7 +88,7 @@ class MyApp extends StatelessWidget {
         ),
 
         // Cards
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           elevation: 4,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
@@ -175,6 +176,8 @@ class MyApp extends StatelessWidget {
         '/create-challenge': (context) => const CreateChallengeScreen(),
         '/waiting-challenges': (context) => const WaitingChallengesScreen(),
         '/game': (context) => const GameScreen(),
+        '/waiting-results': (context) => const WaitingResultsScreen(),
+        '/results': (context) => const ResultsScreen(),
       },
     );
   }
