@@ -277,7 +277,7 @@ class _JoinGameScreenState extends State<JoinGameScreen> {
     setState(() {
       hasScanned = true;
     });
-    _joinGameDirectly("1233");
+    _joinGameDirectly("1652");
   }
 
   @override

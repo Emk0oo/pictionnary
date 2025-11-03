@@ -73,7 +73,10 @@ class _GameScreenState extends State<GameScreen> {
         // Vérifier si le challenge actuel a déjà une image
         _checkCurrentChallengeImage();
       } else {
-        throw Exception('Erreur ${response.statusCode}');
+        print('Erreur 400 détails: ${response.body}');
+        print('Headers: ${response.headers}');
+        print('Request URL: ${response.request?.url}');
+        throw Exception('Erreur ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
       print('Erreur chargement challenges: $e');

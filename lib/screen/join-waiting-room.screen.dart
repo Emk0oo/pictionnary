@@ -87,6 +87,14 @@ class _JoinWaitingRoomScreenState extends State<JoinWaitingRoomScreen> {
             '/create-challenge',
             arguments: {'gameSessionId': _gameSessionId},
           );
+        } else if (newStatus == 'challenge') {
+          print('Navigation vers game screen');
+
+          Navigator.pushReplacementNamed(
+            context,
+            '/game',
+            arguments: {'gameSessionId': _gameSessionId},
+          );
         }
       }
     } catch (e) {
@@ -381,12 +389,14 @@ class _JoinWaitingRoomScreenState extends State<JoinWaitingRoomScreen> {
         children: [
           Icon(Icons.timer, color: Colors.green[600]),
           const SizedBox(width: 12),
-          Text(
-            'Démarrage automatique dans $_autoStartCountdown secondes...',
-            style: TextStyle(
-              color: Colors.green[700],
-              fontWeight: FontWeight.w600,
-              fontSize: 16,
+          Expanded(
+            child: Text(
+              'Démarrage automatique dans $_autoStartCountdown secondes...',
+              style: TextStyle(
+                color: Colors.green[700],
+                fontWeight: FontWeight.w600,
+                fontSize: 16,
+              ),
             ),
           ),
         ],
