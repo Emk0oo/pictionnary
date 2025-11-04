@@ -4,19 +4,19 @@ import 'dart:convert';
 import 'dart:async';
 import '../data/global_data.dart' as global;
 
-class WaitingChallengesScreen extends StatefulWidget {
-  const WaitingChallengesScreen({super.key});
+class WaitingGuessingScreen extends StatefulWidget {
+  const WaitingGuessingScreen({super.key});
 
   @override
-  State<WaitingChallengesScreen> createState() => _WaitingChallengesScreenState();
+  State<WaitingGuessingScreen> createState() => _WaitingGuessingScreenState();
 }
 
-class _WaitingChallengesScreenState extends State<WaitingChallengesScreen>
+class _WaitingGuessingScreenState extends State<WaitingGuessingScreen>
     with TickerProviderStateMixin {
   String? _gameSessionId;
   Timer? _statusTimer;
-  String _gameStatus = 'challenge';
-  int _nbChallenges = 0;
+  String _gameStatus = 'drawing';
+  int _nbDrawingsCompleted = 0;
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
   bool _isNavigating = false;
@@ -24,13 +24,13 @@ class _WaitingChallengesScreenState extends State<WaitingChallengesScreen>
   @override
   void initState() {
     super.initState();
-    
+
     // Animation pour le loading
     _animationController = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
     );
-    
+
     _scaleAnimation = Tween<double>(
       begin: 0.8,
       end: 1.2,
@@ -38,9 +38,9 @@ class _WaitingChallengesScreenState extends State<WaitingChallengesScreen>
       parent: _animationController,
       curve: Curves.easeInOut,
     ));
-    
+
     _animationController.repeat(reverse: true);
-    
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
       if (args != null) {
@@ -68,8 +68,8 @@ class _WaitingChallengesScreenState extends State<WaitingChallengesScreen>
     if (_gameSessionId == null || _isNavigating) return;
 
     try {
-      debugPrint('=== VÉRIFICATION STATUS CHALLENGES ===');
-      
+      debugPrint('=== VÉRIFICATION STATUS GUESSING ===');
+
       final response = await http.get(
         Uri.parse('https://pictioniary.wevox.cloud/api/game_sessions/$_gameSessionId/status'),
         headers: {
@@ -83,18 +83,18 @@ class _WaitingChallengesScreenState extends State<WaitingChallengesScreen>
       if (response.statusCode == 200) {
         final statusData = jsonDecode(response.body);
         final newStatus = statusData['status'];
-        final newNbChallenges = statusData['nbChallenges'] ?? 0;
-        
+        final newNbDrawings = statusData['nbDrawingsCompleted'] ?? 0;
+
         setState(() {
           _gameStatus = newStatus;
-          _nbChallenges = newNbChallenges;
+          _nbDrawingsCompleted = newNbDrawings;
         });
 
-        debugPrint('Status: $newStatus, NbChallenges: $newNbChallenges');
+        debugPrint('Status: $newStatus, NbDrawings: $newNbDrawings');
 
-        // Si le status passe à "drawing", naviguer vers la page de jeu
-        if (newStatus == 'drawing' && !_isNavigating) {
-          debugPrint('Status = drawing ! Navigation vers /game mode=drawing');
+        // Si le status passe à "guessing", naviguer vers la page de jeu mode guessing
+        if (newStatus == 'guessing' && !_isNavigating) {
+          debugPrint('Status = guessing ! Navigation vers /game mode=guessing');
 
           setState(() {
             _isNavigating = true;
@@ -112,23 +112,23 @@ class _WaitingChallengesScreenState extends State<WaitingChallengesScreen>
               '/game',
               arguments: {
                 'gameSessionId': _gameSessionId,
-                'mode': 'drawing',
+                'mode': 'guessing',
               },
             );
           }
         }
       }
     } catch (e) {
-      debugPrint('Erreur vérification status challenges: $e');
+      debugPrint('Erreur vérification status guessing: $e');
     }
   }
 
   String _getStatusText() {
     switch (_gameStatus) {
-      case 'challenge':
-        return 'En attente des défis des autres joueurs...';
       case 'drawing':
-        return 'Tous les défis reçus ! Démarrage du jeu...';
+        return 'En attente que tous les joueurs terminent leurs dessins...';
+      case 'guessing':
+        return 'Tous les dessins terminés ! Démarrage de la phase de devinettes...';
       default:
         return 'Préparation en cours...';
     }
@@ -136,9 +136,9 @@ class _WaitingChallengesScreenState extends State<WaitingChallengesScreen>
 
   Color _getStatusColor() {
     switch (_gameStatus) {
-      case 'challenge':
-        return Colors.orange;
       case 'drawing':
+        return Colors.orange;
+      case 'guessing':
         return Colors.green;
       default:
         return Colors.blue;
@@ -147,9 +147,9 @@ class _WaitingChallengesScreenState extends State<WaitingChallengesScreen>
 
   IconData _getStatusIcon() {
     switch (_gameStatus) {
-      case 'challenge':
-        return Icons.hourglass_empty;
       case 'drawing':
+        return Icons.hourglass_empty;
+      case 'guessing':
         return Icons.play_arrow;
       default:
         return Icons.sync;
@@ -160,7 +160,7 @@ class _WaitingChallengesScreenState extends State<WaitingChallengesScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Préparation de la partie'),
+        title: const Text('En attente de la phase de devinettes'),
         backgroundColor: Theme.of(context).colorScheme.primaryContainer,
         automaticallyImplyLeading: false, // Empêche le retour
       ),
@@ -190,9 +190,9 @@ class _WaitingChallengesScreenState extends State<WaitingChallengesScreen>
                 ),
               ),
             ),
-            
+
             const SizedBox(height: 40),
-            
+
             // Status principal
             Text(
               _getStatusText(),
@@ -202,9 +202,9 @@ class _WaitingChallengesScreenState extends State<WaitingChallengesScreen>
               ),
               textAlign: TextAlign.center,
             ),
-            
+
             const SizedBox(height: 24),
-            
+
             // Informations détaillées
             Container(
               padding: const EdgeInsets.all(20),
@@ -219,13 +219,13 @@ class _WaitingChallengesScreenState extends State<WaitingChallengesScreen>
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        Icons.assignment,
+                        Icons.brush,
                         color: Colors.grey[600],
                         size: 24,
                       ),
                       const SizedBox(width: 12),
                       Text(
-                        'Défis collectés',
+                        'Dessins terminés',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -234,10 +234,10 @@ class _WaitingChallengesScreenState extends State<WaitingChallengesScreen>
                       ),
                     ],
                   ),
-                  
+
                   const SizedBox(height: 16),
-                  
-                  // Barre de progression
+
+                  // Barre de progression (estimation)
                   Container(
                     height: 8,
                     decoration: BoxDecoration(
@@ -245,7 +245,7 @@ class _WaitingChallengesScreenState extends State<WaitingChallengesScreen>
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: FractionallySizedBox(
-                      widthFactor: _nbChallenges / 12, // 4 joueurs × 3 défis = 12 défis max
+                      widthFactor: _nbDrawingsCompleted / 12, // 4 joueurs × 3 dessins = 12 max
                       alignment: Alignment.centerLeft,
                       child: Container(
                         decoration: BoxDecoration(
@@ -255,11 +255,11 @@ class _WaitingChallengesScreenState extends State<WaitingChallengesScreen>
                       ),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 12),
-                  
+
                   Text(
-                    '$_nbChallenges / 12 défis reçus',
+                    'Progression globale',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey[600],
@@ -269,9 +269,9 @@ class _WaitingChallengesScreenState extends State<WaitingChallengesScreen>
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 40),
-            
+
             // Message d'information
             Container(
               padding: const EdgeInsets.all(16),
@@ -290,8 +290,8 @@ class _WaitingChallengesScreenState extends State<WaitingChallengesScreen>
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Vos défis ont été envoyés avec succès !\n'
-                      'La partie commencera dès que tous les joueurs auront terminé.',
+                      'Vous avez terminé tous vos dessins !\n'
+                      'La phase de devinettes commencera dès que tous les joueurs auront terminé.',
                       style: TextStyle(
                         color: Colors.blue[700],
                         fontSize: 14,
@@ -301,10 +301,10 @@ class _WaitingChallengesScreenState extends State<WaitingChallengesScreen>
                 ],
               ),
             ),
-            
-            if (_gameStatus == 'drawing') ...[
+
+            if (_gameStatus == 'guessing') ...[
               const SizedBox(height: 24),
-              
+
               // Indicateur de démarrage
               Container(
                 padding: const EdgeInsets.all(16),
@@ -326,7 +326,7 @@ class _WaitingChallengesScreenState extends State<WaitingChallengesScreen>
                     ),
                     const SizedBox(width: 12),
                     Text(
-                      'Démarrage de la partie...',
+                      'Démarrage de la phase de devinettes...',
                       style: TextStyle(
                         color: Colors.green[700],
                         fontWeight: FontWeight.w600,

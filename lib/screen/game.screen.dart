@@ -50,7 +50,7 @@ class _GameScreenState extends State<GameScreen> {
     if (_gameSessionId == null) return;
 
     try {
-      print('=== CHARGEMENT DES CHALLENGES (${_gameMode.toUpperCase()}) ===');
+      debugPrint('=== CHARGEMENT DES CHALLENGES (${_gameMode.toUpperCase()}) ===');
 
       // Endpoint différent selon le mode
       final endpoint = _gameMode == 'guessing'
@@ -62,8 +62,8 @@ class _GameScreenState extends State<GameScreen> {
         headers: {'Authorization': 'Bearer ${global.token}'},
       );
 
-      print('Status: ${response.statusCode}');
-      print('Response: ${response.body}');
+      debugPrint('Status: ${response.statusCode}');
+      debugPrint('Response: ${response.body}');
 
       if (response.statusCode == 200) {
         final challengesData = jsonDecode(response.body) as List;
@@ -77,22 +77,31 @@ class _GameScreenState extends State<GameScreen> {
           _currentChallengeIndex = 0;
         });
 
-        print('Challenges chargés: ${_challenges.length}');
+        debugPrint('Challenges chargés: ${_challenges.length}');
 
         // Vérifier si le challenge actuel a déjà une image
         _checkCurrentChallengeImage();
       } else {
-        print('Erreur 400 détails: ${response.body}');
-        print('Headers: ${response.headers}');
-        print('Request URL: ${response.request?.url}');
+        debugPrint('Erreur 400 détails: ${response.body}');
+        debugPrint('Headers: ${response.headers}');
+        debugPrint('Request URL: ${response.request?.url}');
         throw Exception('Erreur ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
-      print('Erreur chargement challenges: $e');
+      debugPrint('Erreur chargement challenges: $e');
       setState(() {
         _isLoading = false;
       });
-      _showErrorDialog('Impossible de charger les défis: $e');
+      // Afficher une erreur uniquement si c'est critique
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Impossible de charger les défis: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
     }
   }
 
@@ -141,7 +150,7 @@ class _GameScreenState extends State<GameScreen> {
       final List<dynamic> forbiddenList = jsonDecode(forbiddenWordsJson);
       return forbiddenList.map((word) => word.toString()).toList();
     } catch (e) {
-      print('Erreur parsing forbidden words: $e');
+      debugPrint('Erreur parsing forbidden words: $e');
       return [];
     }
   }
@@ -164,9 +173,9 @@ class _GameScreenState extends State<GameScreen> {
     });
 
     try {
-      print('=== ENVOI DU PROMPT ===');
-      print('Challenge ID: $challengeId');
-      print('Prompt: $prompt');
+      debugPrint('=== ENVOI DU PROMPT ===');
+      debugPrint('Challenge ID: $challengeId');
+      debugPrint('Prompt: $prompt');
 
       final response = await http.post(
         Uri.parse(
@@ -179,8 +188,8 @@ class _GameScreenState extends State<GameScreen> {
         body: jsonEncode({'prompt': prompt}),
       );
 
-      print('Status: ${response.statusCode}');
-      print('Response: ${response.body}');
+      debugPrint('Status: ${response.statusCode}');
+      debugPrint('Response: ${response.body}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final responseData = jsonDecode(response.body);
@@ -214,7 +223,7 @@ class _GameScreenState extends State<GameScreen> {
         throw Exception('Erreur ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
-      print('Erreur envoi prompt: $e');
+      debugPrint('Erreur envoi prompt: $e');
       setState(() {
         _isSendingPrompt = false;
       });
@@ -240,10 +249,10 @@ class _GameScreenState extends State<GameScreen> {
     });
 
     try {
-      print('=== ENVOI DE LA RÉPONSE ===');
-      print('Challenge ID: $challengeId');
-      print('Answer: $answer');
-      print('Is resolved: $isResolved');
+      debugPrint('=== ENVOI DE LA RÉPONSE ===');
+      debugPrint('Challenge ID: $challengeId');
+      debugPrint('Answer: $answer');
+      debugPrint('Is resolved: $isResolved');
 
       final response = await http.post(
         Uri.parse(
@@ -259,8 +268,8 @@ class _GameScreenState extends State<GameScreen> {
         }),
       );
 
-      print('Status: ${response.statusCode}');
-      print('Response: ${response.body}');
+      debugPrint('Status: ${response.statusCode}');
+      debugPrint('Response: ${response.body}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         setState(() {
@@ -289,7 +298,7 @@ class _GameScreenState extends State<GameScreen> {
         throw Exception('Erreur ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
-      print('Erreur envoi réponse: $e');
+      debugPrint('Erreur envoi réponse: $e');
       setState(() {
         _isSendingPrompt = false;
       });
@@ -310,33 +319,38 @@ class _GameScreenState extends State<GameScreen> {
       _checkCurrentChallengeImage();
     } else {
       // Tous les challenges terminés - naviguer vers l'écran d'attente
-      Navigator.pushReplacementNamed(
-        context,
-        '/waiting-results',
-        arguments: {'gameSessionId': _gameSessionId},
-      );
-    }
-  }
+      debugPrint('=== NAVIGATION APRÈS PHASE ${_gameMode.toUpperCase()} ===');
+      debugPrint('Game Session ID: $_gameSessionId');
+      debugPrint('Mode: $_gameMode');
 
-  void _showErrorDialog(String message) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Erreur'),
-          content: Text(message),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).pop();
-              },
-              child: const Text('Retour'),
-            ),
-          ],
+      if (_gameSessionId != null) {
+        if (_gameMode == 'drawing') {
+          // Après drawing, aller sur waiting-guessing pour attendre que tous terminent
+          debugPrint('Navigation vers /waiting-guessing');
+          Navigator.pushReplacementNamed(
+            context,
+            '/waiting-guessing',
+            arguments: {'gameSessionId': _gameSessionId},
+          );
+        } else {
+          // Après guessing, aller sur waiting-results pour attendre finished
+          debugPrint('Navigation vers /waiting-results');
+          Navigator.pushReplacementNamed(
+            context,
+            '/waiting-results',
+            arguments: {'gameSessionId': _gameSessionId},
+          );
+        }
+      } else {
+        debugPrint('ERREUR: gameSessionId est null, impossible de naviguer');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erreur: Session de jeu invalide'),
+            backgroundColor: Colors.red,
+          ),
         );
-      },
-    );
+      }
+    }
   }
 
   @override

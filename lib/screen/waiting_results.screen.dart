@@ -41,8 +41,8 @@ class _WaitingResultsScreenState extends State<WaitingResultsScreen> {
     // Vérification immédiate
     _checkGameStatus();
 
-    // Puis toutes les 3 secondes
-    _pollingTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+    // Puis toutes les 5 secondes
+    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       _checkGameStatus();
     });
   }
@@ -51,6 +51,10 @@ class _WaitingResultsScreenState extends State<WaitingResultsScreen> {
     if (_gameSessionId == null || _isLoadingResults) return;
 
     _pollingAttempts++;
+
+    debugPrint('=== POLLING STATUS (Tentative $_pollingAttempts/$_maxPollingAttempts) ===');
+    debugPrint('Game Session ID: $_gameSessionId');
+    debugPrint('Is Loading Results: $_isLoadingResults');
 
     // Vérifier le timeout
     if (_pollingAttempts >= _maxPollingAttempts) {
@@ -67,27 +71,22 @@ class _WaitingResultsScreenState extends State<WaitingResultsScreen> {
         headers: {'Authorization': 'Bearer ${global.token}'},
       );
 
+      debugPrint('Status API Response Code: ${response.statusCode}');
+      debugPrint('Status API Response Body: ${response.body}');
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final status = data['status'] as String?;
 
-        if (status == 'guessing') {
-          // Phase guessing commence, naviguer vers le jeu en mode guessing
-          _pollingTimer?.cancel();
-          if (mounted) {
-            Navigator.pushReplacementNamed(
-              context,
-              '/game',
-              arguments: {
-                'gameSessionId': _gameSessionId,
-                'mode': 'guessing',
-              },
-            );
-          }
-        } else if (status == 'finished') {
+        debugPrint('>>> STATUT ACTUEL: $status <<<');
+
+        if (status == 'finished') {
           // Le jeu est terminé, récupérer les résultats
+          debugPrint('STATUT FINISHED → Récupération des résultats');
           _pollingTimer?.cancel();
           await _fetchAndShowResults();
+        } else {
+          debugPrint('STATUT $status → Continue d\'attendre');
         }
       }
     } catch (e) {
@@ -98,6 +97,9 @@ class _WaitingResultsScreenState extends State<WaitingResultsScreen> {
 
   Future<void> _fetchAndShowResults() async {
     if (_gameSessionId == null || _isLoadingResults) return;
+
+    debugPrint('=== RÉCUPÉRATION DES CHALLENGES ===');
+    debugPrint('Game Session ID: $_gameSessionId');
 
     setState(() {
       _isLoadingResults = true;
@@ -111,13 +113,19 @@ class _WaitingResultsScreenState extends State<WaitingResultsScreen> {
         headers: {'Authorization': 'Bearer ${global.token}'},
       );
 
+      debugPrint('Challenges API Response Code: ${response.statusCode}');
+      debugPrint('Challenges API Response: ${response.body}');
+
       if (response.statusCode == 200) {
         final challengesData = jsonDecode(response.body) as List;
         final challenges = challengesData
             .map((challenge) => challenge as Map<String, dynamic>)
             .toList();
 
+        debugPrint('Nombre de challenges récupérés: ${challenges.length}');
+
         if (mounted) {
+          debugPrint('Navigation vers /results');
           Navigator.pushReplacementNamed(
             context,
             '/results',
@@ -128,6 +136,7 @@ class _WaitingResultsScreenState extends State<WaitingResultsScreen> {
         throw Exception('Erreur ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
+      debugPrint('Erreur lors de la récupération des challenges: $e');
       setState(() {
         _isLoadingResults = false;
       });
@@ -313,7 +322,7 @@ class _WaitingResultsScreenState extends State<WaitingResultsScreen> {
 
               // Indicateur de temps
               Text(
-                'Vérification toutes les 3 secondes...',
+                'Vérification toutes les 5 secondes...',
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.grey[500],
