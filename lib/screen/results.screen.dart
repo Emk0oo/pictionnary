@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 
 class ResultsScreen extends StatelessWidget {
@@ -384,12 +385,22 @@ class ResultsScreen extends StatelessWidget {
   }
 
   List<Map<String, dynamic>> _getAnswers(Map<String, dynamic> challenge) {
-    final answersData = challenge['answers'];
+    // Try 'proposals' first (API field), then 'answers' (local field)
+    final answersData = challenge['proposals'] ?? challenge['answers'];
 
     if (answersData == null) return [];
 
     try {
-      if (answersData is List) {
+      // If it's a JSON string, parse it first
+      if (answersData is String) {
+        if (answersData.isEmpty) return [];
+        final parsed = jsonDecode(answersData);
+        if (parsed is List) {
+          return parsed.map((a) => a as Map<String, dynamic>).toList();
+        }
+      }
+      // If it's already a list, use it directly
+      else if (answersData is List) {
         return answersData.map((a) => a as Map<String, dynamic>).toList();
       }
       return [];
